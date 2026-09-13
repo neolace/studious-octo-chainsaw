@@ -1,0 +1,109 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: apps/api/global.json
+      - name: Reject committed secrets
+        run: |
+          if git grep -I -nE 'BEGIN (RSA |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}' -- . ':!.github/workflows/ci.yml'; then
+            echo 'Possible secret material committed' >&2
+            exit 1
+          fi
+      - run: npm ci
+      - name: npm dependency audit (high and above)
+        run: npm audit --audit-level=high
+      - name: NuGet dependency audit
+        run: |
+          dotnet restore apps/api/Api.slnx
+          report=$(dotnet package list --project apps/api/Api.slnx --vulnerable --include-transitive --no-restore)
+          echo "$report"
+          if echo "$report" | grep -q 'has the following vulnerable packages'; then
+            echo 'Vulnerable NuGet packages found' >&2
+            exit 1
+          fi
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace apps/web
+      - run: npm run lint --workspace apps/web
+      - run: npm run format:check --workspace apps/web
+      - run: npm run test --workspace apps/web
+      - run: npm run build --workspace apps/web
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:e2e --workspace web
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: apps/api/global.json
+      - run: dotnet restore apps/api/Api.slnx
+      - run: dotnet build apps/api/Api.slnx -c Release --no-restore
+      - run: dotnet test apps/api/Api.slnx -c Release --no-build
+      - run: dotnet format apps/api/Api.slnx --verify-no-changes --no-restore
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace infra
+      - run: npm run lint --workspace infra
+      - run: npm run format:check --workspace infra
+      - run: npm run test --workspace infra
+      - name: CDK synth
+        env:
+          AWS_ACCOUNT_ID: "000000000000"
+          AWS_REGION: us-east-1
+          ENVIRONMENT_NAME: test
+          ENTRA_TENANT_ID: <ENTRA_TENANT_ID>
+          ENTRA_CLIENT_ID: <ENTRA_CLIENT_ID>
+          # Well-formed but self-evidently fake; fromSecretCompleteArn only parses it at synth.
+          ENTRA_CLIENT_SECRET_SECRET_ARN: arn:aws:secretsmanager:us-east-1:000000000000:secret:PLACEHOLDER-000000
+          COGNITO_DOMAIN_PREFIX: runbook-auth-ci
+          FRONTEND_URL: http://localhost:5173
+          FRONTEND_CALLBACK_URL: http://localhost:5173/auth/callback
+          FRONTEND_LOGOUT_URL: http://localhost:5173/
+          CDK_LAMBDA_STUB: "1"
+        run: npm run synth --workspace infra

@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# .NET output (bin/ + obj/). infra/bin/ is the CDK entry point, not build output.
+bin/
+!infra/bin/
+obj/
+publish/
+cdk.out/
+cdk.context.json
+.cdk.staging/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Test / coverage
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.trx
+TestResults/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Lambda packages
+*.zip
+
+# Python (tooling)
+.venv/
+__pycache__/

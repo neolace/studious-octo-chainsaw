@@ -1,0 +1,50 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment name
+        required: true
+        default: dev
+        type: choice
+        options: [dev, test, prod]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # Every CDK invocation (diff and deploy) loads the same config, so it is scoped to the job.
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ENVIRONMENT_NAME: ${{ inputs.environment }}
+      ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
+      ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
+      ENTRA_CLIENT_SECRET_SECRET_ARN: ${{ secrets.ENTRA_CLIENT_SECRET_SECRET_ARN }}
+      COGNITO_DOMAIN_PREFIX: ${{ secrets.COGNITO_DOMAIN_PREFIX }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+      FRONTEND_CALLBACK_URL: ${{ secrets.FRONTEND_CALLBACK_URL }}
+      FRONTEND_LOGOUT_URL: ${{ secrets.FRONTEND_LOGOUT_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: apps/api/global.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - run: npm ci
+      - run: dotnet publish apps/api/src/Web/Web.csproj -c Release -r linux-arm64 --self-contained false -o apps/api/src/Web/bin/lambda
+      - run: npm run cdk:diff
+      - run: npm run cdk:deploy

@@ -1,0 +1,10 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["README.md", "cdk*.json", "dist", "node_modules", "test"]
+  },
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true
+  }
+}

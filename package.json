@@ -1,0 +1,29 @@
+{
+  "name": "studious-octo-chainsaw",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "workspaces": [
+    "apps/web",
+    "infra"
+  ],
+  "scripts": {
+    "install:all": "npm install && dotnet restore apps/api/Api.slnx",
+    "build": "npm run build --workspace apps/web && dotnet build apps/api/Api.slnx -c Release && npm run build --workspace infra",
+    "dev": "npm run dev --workspace apps/web",
+    "dev:api": "dotnet run --project apps/api/src/Web/Web.csproj",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "npm run test --workspace apps/web && dotnet test apps/api/tests/Web.UnitTests/Web.UnitTests.csproj && dotnet test apps/api/tests/Application.UnitTests/Application.UnitTests.csproj && npm run test --workspace infra",
+    "test:integration": "dotnet test apps/api/tests/Web.IntegrationTests/Web.IntegrationTests.csproj",
+    "test:e2e": "npm run test:e2e --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web && npm run lint --workspace infra",
+    "format": "npm run format --workspace apps/web && npm run format --workspace infra && dotnet format apps/api/Api.slnx",
+    "format:check": "npm run format:check --workspace apps/web && npm run format:check --workspace infra && dotnet format apps/api/Api.slnx --verify-no-changes",
+    "typecheck": "npm run typecheck --workspace apps/web && npm run typecheck --workspace infra",
+    "cdk:synth": "npm run synth --workspace infra",
+    "cdk:diff": "npm run diff --workspace infra",
+    "cdk:deploy": "npm run deploy --workspace infra",
+    "clean": "npm run clean --workspaces --if-present && dotnet clean apps/api/Api.slnx"
+  }
+}
